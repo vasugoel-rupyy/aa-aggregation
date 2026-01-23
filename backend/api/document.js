@@ -50,7 +50,6 @@ startxref
 `,
   );
 
-  // First send the valid PDF
   res.write(pdfHeader);
   sent += pdfHeader.length;
 
@@ -64,7 +63,7 @@ startxref
     }
 
     const chunkSize = Math.min(64 * 1024, totalBytes - sent);
-    const chunk = Buffer.alloc(chunkSize, " "); // harmless filler
+    const chunk = Buffer.alloc(chunkSize, " ");
 
     sent += chunkSize;
 

@@ -15,16 +15,6 @@ app.use(analyticsRoutes);
 app.use(documentRoutes);
 app.use(aggregatorRoutes);
 
-
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-// setInterval(() => {
-//   const mem = process.memoryUsage();
-//   console.log("[MEM]", {
-//     rssMB: Math.round(mem.rss / 1024 / 1024),
-//     heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-//     heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
-//   });
-// }, 1000);

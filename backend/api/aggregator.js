@@ -5,13 +5,11 @@ const os = require("os");
 
 const router = express.Router();
 
-// Check if client supports gzip
 function supportsGzip(req) {
   const enc = req.headers["accept-encoding"] || "";
   return enc.includes("gzip");
 }
 
-// Pipe helper with client-disconnect handling
 function pipeStream(readable, writable, req) {
   return new Promise((resolve, reject) => {
     const onClose = () => {
@@ -58,12 +56,12 @@ router.get("/aa/aggregated-response", async (req, res) => {
     out.write('{"statement":');
 
     const statementRes = await axios.get(
-      "http://localhost:3000/internal/statement?count=5000", 
+      "http://localhost:3000/internal/statement?count=5000",
       {
         responseType: "stream",
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
-      }
+      },
     );
 
     await pipeStream(statementRes.data, out, req);
@@ -76,7 +74,7 @@ router.get("/aa/aggregated-response", async (req, res) => {
         responseType: "stream",
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
-      }
+      },
     );
 
     await pipeStream(analyticsRes.data, out, req);
@@ -86,7 +84,7 @@ router.get("/aa/aggregated-response", async (req, res) => {
     const documentMeta = {
       filename: "statement.pdf",
       sizeMB: 50,
-      downloadUrl: "/internal/document?mb=750"
+      downloadUrl: "/internal/document?mb=750",
     };
 
     out.write(JSON.stringify(documentMeta));
@@ -99,14 +97,13 @@ router.get("/aa/aggregated-response", async (req, res) => {
 
     const cpuMs = (endCpu.user + endCpu.system) / 1000;
     const wallMs = Number(endTime - startTime) / 1e6;
-    const cpuUsagePercent = (cpuMs / wallMs) / numCores * 100;
+    const cpuUsagePercent = (cpuMs / wallMs / numCores) * 100;
 
     console.log("[STATS]", {
       cpuMs: Math.round(cpuMs),
       wallMs: Math.round(wallMs),
       cpuUsagePercent: cpuUsagePercent.toFixed(2) + "%",
     });
-
   } catch (err) {
     if (err.message === "Client disconnected") {
       console.log("[INFO] Client disconnected, stopped aggregation");

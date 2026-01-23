@@ -1,8 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-
-const PORT = 3000;  
+const PORT = 3000;
 
 router.get("/internal/statement", (req, res) => {
   const count = Number(req.query.count || 1000);
@@ -15,13 +14,13 @@ router.get("/internal/statement", (req, res) => {
       amount: Math.floor(Math.random() * 10000),
       mode: "UPI",
       merchant: "Test Merchant",
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
   res.json({
     accountId: "ACC123",
-    transactions
+    transactions,
   });
 });
 

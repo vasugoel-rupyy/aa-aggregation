@@ -42,7 +42,6 @@ export default function Home() {
       if (data.document?.downloadUrl) {
         setPdfUrl("http://localhost:3000" + data.document.downloadUrl);
       }
-
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Unknown error");
@@ -78,14 +77,18 @@ export default function Home() {
         {/* Stats */}
         {timeMs !== null && (
           <div style={styles.section}>
-            <p><strong>Total Client Time:</strong> {timeMs} ms</p>
+            <p>
+              <strong>Total Client Time:</strong> {timeMs} ms
+            </p>
           </div>
         )}
 
         {/* JSON Viewer */}
         {responseJson && (
           <div style={styles.section}>
-            <p style={{ marginBottom: 8 }}><strong>Aggregated Response</strong></p>
+            <p style={{ marginBottom: 8 }}>
+              <strong>Aggregated Response</strong>
+            </p>
             <pre style={styles.pre}>
               {JSON.stringify(responseJson, null, 2)}
             </pre>
@@ -95,7 +98,9 @@ export default function Home() {
         {/* PDF Loader */}
         {pdfUrl && (
           <div style={styles.section}>
-            <p style={{ marginBottom: 8 }}><strong>Document</strong></p>
+            <p style={{ marginBottom: 8 }}>
+              <strong>Document</strong>
+            </p>
 
             {!showPdf && (
               <button
