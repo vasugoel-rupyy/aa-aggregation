@@ -15,7 +15,7 @@ I attempted to reproduce the “truncated response” issue by experimenting wit
 
 When I used Promise.all to call all three APIs in parallel, the only reproducible failure mode was OOM. However, when I serialized the API calls (one after another), I was able to occasionally observe truncated responses when the process crashed mid-serialization.
 
-![alt text](image.png)
+![alt text](./aa-frontend/images/image.png)
 
 Apart from backend-side failures, this design also has several production risks:
 
@@ -27,15 +27,15 @@ The only viable solution so far in terms of payload management is to stream the 
 
 First experiment was to stream the aggregated API, which worked fine for smaller paylaods but once again, encountered the same issue where I was received a string too long error.
 
-![alt text](image-2.png)
+![alt text](./aa-frontend/images/image-2.png)
 
 This meant that along with streaming the entire API, i must also stream the incoming document API instead of loading the entire API, secondly I was initally converting it into a base 64 string which was creating excessive memory in the V8 buffer, so to solve that, instead of sending a JSON string, I sent  a raw binary buffer reducing the payload size by 1.33 times
 
-![alt text](image-3.png)
+![alt text](./aa-frontend/images/image-3.png)
 
 After this change, I was able to successfully send payloads as large as 40 GB, which is likely far more than any single client would realistically receive. The next challenge is to understand how this pipeline will behave in a real production environment where failures can occur at multiple stages.
 
 After stabilizing the backend, I also added compression in the document stream and verified end-to-end behavior by building a small frontend to test client-side handling. Files as large as 1 GB were successfully transferred and rendered which I think is more than enough.
-![alt text](image-4.png)
+![alt text](./aa-frontend/images/image-4.png)
 
-![alt text](image-6.png)
+![alt text](./aa-frontend/images/image-6.png)
