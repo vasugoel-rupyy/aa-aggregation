@@ -3,7 +3,7 @@
 <!-- Day 1 -->
 I started by creating a standalone Document API that allocates raw bits to simulate a PDF payload. While testing its upper limits, I observed that allocating more than ~512 MB of string data consistently causes the API to crash and return a 500 Internal Server Error along with "Cannot allocate string longer than Ox1ffffffe8 characters", which is 512 MB. This helped establish a practical memory ceiling for large binary-like responses.
 
-![alt text](image-1.png)
+![alt text](./aa-frontend/images/image-1.png)
 
 Next, I implemented a Statement API that accepts a count parameter and generates that many random JSON objects, which are then written to a JSON file. During edge-case testing, I found that each JSON object is approximately 250–300 bytes in size. Based on this, the system starts hitting limits around 1e6 to 1e7 records which also validates the 512 MB claim, and a similar behavior was observed for the Analytics API.
 
