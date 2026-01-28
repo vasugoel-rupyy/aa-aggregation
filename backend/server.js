@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const { initMySQL } = require("./db/mysql");
 
 const PORT = 3000;
 app.use(cors({ origin: "http://localhost:3001" }));
@@ -14,6 +15,10 @@ app.use(statementRoutes);
 app.use(analyticsRoutes);
 app.use(documentRoutes);
 app.use(aggregatorRoutes);
+
+(async () => {
+  await initMySQL();
+})();
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

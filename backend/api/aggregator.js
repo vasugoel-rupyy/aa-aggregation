@@ -2,6 +2,8 @@ const express = require("express");
 const axios = require("axios");
 const zlib = require("zlib");
 const os = require("os");
+const { writeRequestEvent } = require("../db/mysql");
+const { v4: uuidv4 } = require("uuid");
 
 const router = express.Router();
 
@@ -32,6 +34,63 @@ function pipeStream(readable, writable, req) {
 }
 
 router.get("/aa/aggregated-response", async (req, res) => {
+  const requestId = uuidv4();
+
+  const ctx = {
+    requestId,
+    receivedAt: new Date(),
+    finalised: false,
+
+    // will be filled later
+    completedAt: null,
+    durationMs: null,
+
+    outcome: "FAILED",
+    errorType: null,
+
+    documentSizeMb: null,
+    aggregatedJsonSizeMb: null,
+
+    heapUsedMb: null,
+    rssMb: null,
+
+    connectionClosedEarly: false,
+  };
+
+  res.on("finish", () => {
+    if (ctx.finalized) return;
+
+    ctx.completedAt = new Date();
+    ctx.durationMs = ctx.completedAt - ctx.receivedAt;
+
+    ctx.outcome = "SUCCESS";
+    ctx.finalized = true;
+
+    writeRequestEvent(ctx);
+  });
+
+  res.on("close", () => {
+    if (ctx.finalized) {
+      if (ctx.outcome === "SUCCESS") {
+        ctx.outcome = "PARTIAL";
+        ctx.errorType = "CLIENT_DISCONNECT";
+        ctx.connectionClosedEarly = true;
+
+        writeRequestEvent(ctx);
+      }
+      return;
+    }
+
+    ctx.completedAt = new Date();
+    ctx.durationMs = ctx.completedAt - ctx.receivedAt;
+    ctx.connectionClosedEarly = true;
+    ctx.outcome = "PARTIAL";
+    ctx.errorType = "CLIENT_DISCONNECT";
+    ctx.finalized = true;
+
+    writeRequestEvent(ctx);
+  });
+
   let out = res;
   let gzip;
 
