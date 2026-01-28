@@ -40,3 +40,9 @@ After stabilizing the backend, I also added compression in the document stream a
 
 ![alt text](./aa-frontend/images/image-6.png)
 
+Added db schemas for auditabiltiy and telemetry logging, this is the schema for statement and analytics API
+
+![alt text](image.png)
+
+This is the schema for document API
+![alt text](image-1.png)
