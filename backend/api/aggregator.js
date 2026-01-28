@@ -132,7 +132,7 @@ router.get("/aa/aggregated-response", async (req, res) => {
 
     await pipeStream(statementRes.data, out, req, ctx);
 
-    writeChunk(out, res, ctx, '{"analytics":');
+    writeChunk(out, res, ctx, ',"analytics":');
 
     const analyticsRes = await axios.get(
       "http://localhost:3000/internal/analytics?count=1",
@@ -145,12 +145,12 @@ router.get("/aa/aggregated-response", async (req, res) => {
 
     await pipeStream(analyticsRes.data, out, req, ctx);
 
-    writeChunk(out, res, ctx, '{"document":');
+    writeChunk(out, res, ctx, ', "document":');
 
     const documentMeta = {
       filename: "statement.pdf",
       sizeMB: 5,
-      downloadUrl: `/internal/document?mb=5&requestId=${ctx.requestId}`,
+      downloadUrl: `/internal/document?mb=500&requestId=${ctx.requestId}`,
     };
 
     out.write(JSON.stringify(documentMeta));

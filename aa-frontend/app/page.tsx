@@ -34,23 +34,23 @@ export default function Home() {
       }
 
       const text = await res.text();
+      console.log("Full response text:", text);
+      console.log("JSON:", JSON.parse(text));
       const end = performance.now();
       setTimeMs(Math.round(end - start));
 
       try {
         const data = JSON.parse(text);
-        setResponseJson(data);
+        setResponseJson(text);
 
         if (data.document?.downloadUrl) {
           setPdfUrl("http://localhost:3000" + data.document.downloadUrl);
         }
       } catch {
-        // 🔑 THIS IS THE FIX
         setWarning(
           "Large streamed response could not be fully parsed in the browser. This is expected. Document download is still available.",
         );
 
-        // Try best-effort extraction of document URL
         const match = text.match(/"downloadUrl"\s*:\s*"([^"]+)"/);
         if (match) {
           setPdfUrl("http://localhost:3000" + match[1]);
@@ -67,9 +67,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
       <div className="w-full max-w-5xl bg-slate-800 rounded-xl shadow-2xl p-6 text-slate-200">
-        <h1 className="text-2xl font-semibold mb-4">
-          AA Aggregation Demo
-        </h1>
+        <h1 className="text-2xl font-semibold mb-4">AA Aggregation Demo</h1>
 
         <button
           onClick={callAggregator}
