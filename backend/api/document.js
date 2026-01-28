@@ -1,23 +1,64 @@
-const { Readable } = require("stream");
 const express = require("express");
 const router = express.Router();
+const { v4: uuidv4 } = require("uuid");
+const { validate: isValidUuid } = require("uuid");
+const { writeDocumentEvent } = require("../db/mysql");
 
 router.get("/internal/document", (req, res) => {
   const mb = Number(req.query.mb || 5);
   const totalBytes = mb * 1024 * 1024;
+  const start = Date.now();
+
+  const rawRequestId = req.query.requestId;
+  const requestId = isValidUuid(rawRequestId) ? rawRequestId : null;
+
+  const ctx = {
+    requestId,
+    documentName: "statement.pdf",
+
+    receivedAt: new Date(),
+    completedAt: null,
+    durationMs: null,
+
+    documentSizeMb: mb,
+    bytesSent: 0,
+
+    outcome: null,
+    errorType: null,
+    connectionClosedEarly: false,
+
+    finalized: false,
+  };
 
   console.log("[DOC] Serving", mb, "MB PDF");
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", 'inline; filename="statement.pdf"');
 
-  let sent = 0;
-  let aborted = false;
+  function finalizeSuccess() {
+    if (ctx.finalized) return;
+    ctx.completedAt = new Date();
+    ctx.durationMs = Date.now() - start;
+    ctx.outcome = "SUCCESS";
+    ctx.finalized = true;
+    writeDocumentEvent(ctx);
+  }
 
-  req.on("close", () => {
-    aborted = true;
-    console.log("[DOC] Client disconnected");
-  });
+  function finalizePartial() {
+    if (ctx.finalized) return;
+    ctx.completedAt = new Date();
+    ctx.durationMs = Date.now() - start;
+    ctx.connectionClosedEarly = true;
+    ctx.outcome = "PARTIAL";
+    ctx.errorType = "CLIENT_DISCONNECT";
+    ctx.finalized = true;
+    writeDocumentEvent(ctx);
+  }
+
+  res.on("finish", finalizeSuccess);
+  res.on("close", finalizePartial);
+
+  let sent = 0;
 
   const pdfHeader = Buffer.from(
     `%PDF-1.4
@@ -50,12 +91,16 @@ startxref
 `,
   );
 
-  res.write(pdfHeader);
+  function safeWrite(buf) {
+    if (res.writableEnded || res.destroyed) return false;
+    ctx.bytesSent += buf.length;
+    return res.write(buf);
+  }
+
+  safeWrite(pdfHeader);
   sent += pdfHeader.length;
 
   function sendChunk() {
-    if (aborted) return;
-
     if (sent >= totalBytes) {
       res.end();
       console.log("[DOC] Finished sending");
@@ -67,8 +112,7 @@ startxref
 
     sent += chunkSize;
 
-    const ok = res.write(chunk);
-    if (ok) {
+    if (safeWrite(chunk)) {
       setImmediate(sendChunk);
     } else {
       res.once("drain", sendChunk);

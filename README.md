@@ -39,3 +39,4 @@ After stabilizing the backend, I also added compression in the document stream a
 ![alt text](./aa-frontend/images/image-4.png)
 
 ![alt text](./aa-frontend/images/image-6.png)
+

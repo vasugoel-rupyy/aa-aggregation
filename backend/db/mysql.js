@@ -20,6 +20,46 @@ async function initMySQL() {
   }
 }
 
+async function writeDocumentEvent(event) {
+  if (!pool) return;
+
+  try {
+    const sql = `
+      INSERT INTO document_events (
+        request_id,
+        document_name,
+        received_at,
+        completed_at,
+        duration_ms,
+        document_size_mb,
+        bytes_sent,
+        outcome,
+        error_type,
+        connection_closed_early
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const values = [
+      event.requestId,
+      event.documentName,
+      event.receivedAt,
+      event.completedAt,
+      event.durationMs,
+      event.documentSizeMb,
+      event.bytesSent,
+      event.outcome,
+      event.errorType,
+      event.connectionClosedEarly,
+    ];
+
+    await pool.execute(sql, values);
+  } catch (err) {
+    console.error("Failed to persist document event:", err.message);
+  }
+}
+
+
 async function writeRequestEvent(event) {
   if (!pool) return;
 
@@ -33,11 +73,12 @@ async function writeRequestEvent(event) {
         outcome,
         error_type,
         document_size_mb,
-        aggregated_json_size_mb,
+        bytes_sent,
         heap_used_mb,
         rss_mb,
         connection_closed_early
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -48,7 +89,7 @@ async function writeRequestEvent(event) {
       event.outcome,
       event.errorType,
       event.documentSizeMb,
-      event.aggregatedJsonSizeMb,
+      event.bytesSent,
       event.heapUsedMb,
       event.rssMb,
       event.connectionClosedEarly,
@@ -63,4 +104,5 @@ async function writeRequestEvent(event) {
 module.exports = {
   initMySQL,
   writeRequestEvent,
+  writeDocumentEvent,
 };

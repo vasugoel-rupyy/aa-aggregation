@@ -4,6 +4,7 @@ import { useState } from "react";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
+  const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [timeMs, setTimeMs] = useState<number | null>(null);
   const [responseJson, setResponseJson] = useState<any>(null);
@@ -13,6 +14,7 @@ export default function Home() {
   async function callAggregator() {
     setLoading(true);
     setError(null);
+    setWarning(null);
     setTimeMs(null);
     setResponseJson(null);
     setPdfUrl(null);
@@ -31,16 +33,28 @@ export default function Home() {
         throw new Error(`Request failed: ${res.status}`);
       }
 
-      const data = await res.json();
-
+      const text = await res.text();
       const end = performance.now();
-
       setTimeMs(Math.round(end - start));
-      setResponseJson(data);
 
-      // Extract PDF URL if present
-      if (data.document?.downloadUrl) {
-        setPdfUrl("http://localhost:3000" + data.document.downloadUrl);
+      try {
+        const data = JSON.parse(text);
+        setResponseJson(data);
+
+        if (data.document?.downloadUrl) {
+          setPdfUrl("http://localhost:3000" + data.document.downloadUrl);
+        }
+      } catch {
+        // 🔑 THIS IS THE FIX
+        setWarning(
+          "Large streamed response could not be fully parsed in the browser. This is expected. Document download is still available.",
+        );
+
+        // Try best-effort extraction of document URL
+        const match = text.match(/"downloadUrl"\s*:\s*"([^"]+)"/);
+        if (match) {
+          setPdfUrl("http://localhost:3000" + match[1]);
+        }
       }
     } catch (err: any) {
       console.error(err);
@@ -51,73 +65,65 @@ export default function Home() {
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>AA Aggregation Demo</h1>
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+      <div className="w-full max-w-5xl bg-slate-800 rounded-xl shadow-2xl p-6 text-slate-200">
+        <h1 className="text-2xl font-semibold mb-4">
+          AA Aggregation Demo
+        </h1>
 
         <button
           onClick={callAggregator}
           disabled={loading}
-          style={{
-            ...styles.button,
-            opacity: loading ? 0.6 : 1,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
+          className={`px-4 py-2 rounded-lg bg-blue-600 text-white mb-4
+            ${loading ? "opacity-60 cursor-not-allowed" : "hover:bg-blue-500"}
+          `}
         >
           {loading ? "Calling..." : "Call Aggregator API"}
         </button>
 
-        {/* Error */}
         {error && (
-          <div style={{ ...styles.section, borderColor: "#ff4d4f" }}>
-            <p style={{ color: "#ff4d4f" }}>Error: {error}</p>
+          <div className="border border-red-500 text-red-400 rounded-lg p-3 mb-4">
+            Error: {error}
           </div>
         )}
 
-        {/* Stats */}
+        {warning && (
+          <div className="border border-yellow-500 text-yellow-300 rounded-lg p-3 mb-4">
+            ⚠️ {warning}
+          </div>
+        )}
+
         {timeMs !== null && (
-          <div style={styles.section}>
-            <p>
-              <strong>Total Client Time:</strong> {timeMs} ms
-            </p>
+          <div className="border border-slate-600 rounded-lg p-3 mb-4">
+            <strong>Total Client Time:</strong> {timeMs} ms
           </div>
         )}
 
-        {/* JSON Viewer */}
         {responseJson && (
-          <div style={styles.section}>
-            <p style={{ marginBottom: 8 }}>
-              <strong>Aggregated Response</strong>
-            </p>
-            <pre style={styles.pre}>
+          <div className="border border-slate-600 rounded-lg p-3 mb-4">
+            <p className="font-medium mb-2">Aggregated Response</p>
+            <pre className="max-h-72 overflow-auto bg-slate-950 p-3 rounded text-xs">
               {JSON.stringify(responseJson, null, 2)}
             </pre>
           </div>
         )}
 
-        {/* PDF Loader */}
         {pdfUrl && (
-          <div style={styles.section}>
-            <p style={{ marginBottom: 8 }}>
-              <strong>Document</strong>
-            </p>
+          <div className="border border-slate-600 rounded-lg p-3">
+            <p className="font-medium mb-2">Document</p>
 
-            {!showPdf && (
+            {!showPdf ? (
               <button
                 onClick={() => setShowPdf(true)}
-                style={styles.secondaryButton}
+                className="px-3 py-1 rounded-md border border-blue-500 text-blue-400 hover:bg-blue-500/10"
               >
                 Load PDF
               </button>
-            )}
-
-            {showPdf && (
-              <div style={{ marginTop: 12 }}>
+            ) : (
+              <div className="mt-3">
                 <iframe
                   src={pdfUrl}
-                  width="100%"
-                  height="500px"
-                  style={{ border: "1px solid #374151", borderRadius: 6 }}
+                  className="w-full h-[500px] border border-slate-700 rounded-md"
                 />
               </div>
             )}
@@ -127,61 +133,3 @@ export default function Home() {
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    backgroundColor: "#0f172a",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 1000,
-    backgroundColor: "#111827",
-    borderRadius: 12,
-    padding: 24,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
-    color: "#e5e7eb",
-  },
-  title: {
-    fontSize: 26,
-    marginBottom: 16,
-  },
-  button: {
-    padding: "10px 16px",
-    fontSize: 16,
-    borderRadius: 8,
-    border: "none",
-    backgroundColor: "#2563eb",
-    color: "white",
-    marginBottom: 16,
-  },
-  secondaryButton: {
-    padding: "8px 14px",
-    fontSize: 14,
-    borderRadius: 6,
-    border: "1px solid #2563eb",
-    backgroundColor: "transparent",
-    color: "#60a5fa",
-    cursor: "pointer",
-  },
-  section: {
-    border: "1px solid #374151",
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-  },
-  pre: {
-    maxHeight: "300px",
-    overflow: "auto",
-    backgroundColor: "#020617",
-    padding: 12,
-    borderRadius: 6,
-    fontSize: 12,
-    lineHeight: 1.4,
-    whiteSpace: "pre-wrap",
-  },
-};

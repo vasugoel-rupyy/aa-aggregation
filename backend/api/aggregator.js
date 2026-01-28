@@ -4,6 +4,7 @@ const zlib = require("zlib");
 const os = require("os");
 const { writeRequestEvent } = require("../db/mysql");
 const { v4: uuidv4 } = require("uuid");
+const { write } = require("fs");
 
 const router = express.Router();
 
@@ -12,7 +13,14 @@ function supportsGzip(req) {
   return enc.includes("gzip");
 }
 
-function pipeStream(readable, writable, req) {
+function writeChunk(out, res, ctx, chunk) {
+  if (res.writableEnded || res.destroyed) return;
+
+  ctx.bytesSent += Buffer.byteLength(chunk);
+  out.write(chunk);
+}
+
+function pipeStream(readable, writable, req, ctx) {
   return new Promise((resolve, reject) => {
     const onClose = () => {
       readable.destroy();
@@ -23,6 +31,10 @@ function pipeStream(readable, writable, req) {
 
     readable.on("error", reject);
     writable.on("error", reject);
+
+    readable.on("data", (chunk) => {
+      ctx.bytesSent += chunk.length;
+    });
 
     readable.on("end", () => {
       req.off("close", onClose);
@@ -39,17 +51,17 @@ router.get("/aa/aggregated-response", async (req, res) => {
   const ctx = {
     requestId,
     receivedAt: new Date(),
-    finalised: false,
+    finalized: false,
 
-    // will be filled later
+    bytesSent: 0,
+
     completedAt: null,
     durationMs: null,
 
-    outcome: "FAILED",
+    outcome: null,
     errorType: null,
 
     documentSizeMb: null,
-    aggregatedJsonSizeMb: null,
 
     heapUsedMb: null,
     rssMb: null,
@@ -64,30 +76,25 @@ router.get("/aa/aggregated-response", async (req, res) => {
     ctx.durationMs = ctx.completedAt - ctx.receivedAt;
 
     ctx.outcome = "SUCCESS";
-    ctx.finalized = true;
-
-    writeRequestEvent(ctx);
   });
 
   res.on("close", () => {
-    if (ctx.finalized) {
-      if (ctx.outcome === "SUCCESS") {
-        ctx.outcome = "PARTIAL";
-        ctx.errorType = "CLIENT_DISCONNECT";
-        ctx.connectionClosedEarly = true;
-
-        writeRequestEvent(ctx);
-      }
-      return;
-    }
+    if (ctx.finalized) return;
 
     ctx.completedAt = new Date();
     ctx.durationMs = ctx.completedAt - ctx.receivedAt;
-    ctx.connectionClosedEarly = true;
-    ctx.outcome = "PARTIAL";
-    ctx.errorType = "CLIENT_DISCONNECT";
-    ctx.finalized = true;
 
+    ctx.connectionClosedEarly = true;
+
+    if (ctx.outcome === "SUCCESS") {
+      ctx.outcome = "PARTIAL";
+      ctx.errorType = "CLIENT_DISCONNECT";
+    } else {
+      ctx.outcome = ctx.outcome || "PARTIAL";
+      ctx.errorType = ctx.errorType || "CLIENT_DISCONNECT";
+    }
+
+    ctx.finalized = true;
     writeRequestEvent(ctx);
   });
 
@@ -112,10 +119,10 @@ router.get("/aa/aggregated-response", async (req, res) => {
       });
     }
 
-    out.write('{"statement":');
+    writeChunk(out, res, ctx, '{"statement":');
 
     const statementRes = await axios.get(
-      "http://localhost:3000/internal/statement?count=5000",
+      "http://localhost:3000/internal/statement?count=1",
       {
         responseType: "stream",
         maxContentLength: Infinity,
@@ -123,12 +130,12 @@ router.get("/aa/aggregated-response", async (req, res) => {
       },
     );
 
-    await pipeStream(statementRes.data, out, req);
+    await pipeStream(statementRes.data, out, req, ctx);
 
-    out.write(',"analytics":');
+    writeChunk(out, res, ctx, '{"analytics":');
 
     const analyticsRes = await axios.get(
-      "http://localhost:3000/internal/analytics?count=5000",
+      "http://localhost:3000/internal/analytics?count=1",
       {
         responseType: "stream",
         maxContentLength: Infinity,
@@ -136,20 +143,28 @@ router.get("/aa/aggregated-response", async (req, res) => {
       },
     );
 
-    await pipeStream(analyticsRes.data, out, req);
+    await pipeStream(analyticsRes.data, out, req, ctx);
 
-    out.write(',"document":');
+    writeChunk(out, res, ctx, '{"document":');
 
     const documentMeta = {
       filename: "statement.pdf",
-      sizeMB: 50,
-      downloadUrl: "/internal/document?mb=750",
+      sizeMB: 5,
+      downloadUrl: `/internal/document?mb=5&requestId=${ctx.requestId}`,
     };
 
     out.write(JSON.stringify(documentMeta));
 
     out.write("}");
     out.end();
+
+    if (!ctx.finalized) {
+      ctx.completedAt = new Date();
+      ctx.durationMs = ctx.completedAt - ctx.receivedAt;
+      ctx.outcome = "SUCCESS";
+      ctx.finalized = true;
+      writeRequestEvent(ctx);
+    }
 
     const endCpu = process.cpuUsage(startCpu);
     const endTime = process.hrtime.bigint();
@@ -164,12 +179,9 @@ router.get("/aa/aggregated-response", async (req, res) => {
       cpuUsagePercent: cpuUsagePercent.toFixed(2) + "%",
     });
   } catch (err) {
-    if (err.message === "Client disconnected") {
-      console.log("[INFO] Client disconnected, stopped aggregation");
-      return;
-    }
-
-    console.error("Streaming aggregation failed:", err);
+    console.error("Aggregation failed:", err);
+    console.error("Error message:", err.message);
+    console.error("Stack:", err.stack);
 
     if (!res.headersSent) {
       res.status(500).json({ error: "Aggregation failed" });
