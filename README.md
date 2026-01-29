@@ -1,6 +1,7 @@
 # aa-aggregation
 
 <!-- Day 1 -->
+
 I started by creating a standalone Document API that allocates raw bits to simulate a PDF payload. While testing its upper limits, I observed that allocating more than ~512 MB of string data consistently causes the API to crash and return a 500 Internal Server Error along with "Cannot allocate string longer than Ox1ffffffe8 characters", which is 512 MB. This helped establish a practical memory ceiling for large binary-like responses.
 
 ![alt text](./aa-frontend/images/image-1.png)
@@ -29,7 +30,7 @@ First experiment was to stream the aggregated API, which worked fine for smaller
 
 ![alt text](./aa-frontend/images/image-2.png)
 
-This meant that along with streaming the entire API, i must also stream the incoming document API instead of loading the entire API, secondly I was initally converting it into a base 64 string which was creating excessive memory in the V8 buffer, so to solve that, instead of sending a JSON string, I sent  a raw binary buffer reducing the payload size by 1.33 times
+This meant that along with streaming the entire API, i must also stream the incoming document API instead of loading the entire API, secondly I was initally converting it into a base 64 string which was creating excessive memory in the V8 buffer, so to solve that, instead of sending a JSON string, I sent a raw binary buffer reducing the payload size by 1.33 times
 
 ![alt text](./aa-frontend/images/image-3.png)
 
@@ -50,3 +51,9 @@ This is the schema for document API
 Tested via frontend, enabled connection pooling by using .createPool instead of .createConnection
 
 ![alt text](./aa-frontend/images/image-9.png)
+
+Split DB schema into client requests, client responses, document responses, internal service calls, document summary and request summary
+
+Refactored backend into services and also encountered a bug where pdf failed to load but was showing as success in backend, so created new client-error route file to fix that issue
+Split DB schema into client requests, client responses, document responses, internal service calls, document summary and request summary
+Refactored backend into services and also encountered a bug where pdf failed to load but was showing as success in backend, so created new client-error route file to fix that issue
