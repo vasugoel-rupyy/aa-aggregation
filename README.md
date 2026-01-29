@@ -46,3 +46,7 @@ Added db schemas for auditabiltiy and telemetry logging, this is the schema for 
 
 This is the schema for document API
 ![alt text](./aa-frontend/images/image-1.png)
+
+Tested via frontend, enabled connection pooling by using .createPool instead of .createConnection
+
+![alt text](./aa-frontend/images/image-9.png)
