@@ -41,7 +41,7 @@ export default function Home() {
 
       try {
         const data = JSON.parse(text);
-        setResponseJson(text);
+        setResponseJson(data);
 
         if (data.document?.downloadUrl) {
           setPdfUrl("http://localhost:3000" + data.document.downloadUrl);
