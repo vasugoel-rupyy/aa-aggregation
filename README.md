@@ -55,3 +55,7 @@ Tested via frontend, enabled connection pooling by using .createPool instead of 
 Split DB schema into client requests, client responses, document responses, internal service calls, document summary and request summary
 
 Refactored backend into services and also encountered a bug where pdf failed to load but was showing as success in backend, so created new client-error route file to fix that issue
+
+Final Schema 
+
+![alt text](./aa-frontend/images/image-10.png)
