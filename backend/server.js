@@ -17,7 +17,11 @@ app.use(documentRoutes);
 app.use(aggregatorRoutes);
 
 (async () => {
-  await initMySQL();
+  try {
+    await initMySQL();
+  } catch (err) {
+    console.error("Unexpected MySQL init failure:", err);
+  }
 })();
 
 app.listen(PORT, () => {

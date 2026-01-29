@@ -9,7 +9,11 @@ async function initMySQL() {
       user: "aa_user",
       password: "aa_pass",
       database: "aa_observability",
+
       connectionLimit: 5,
+
+      waitForConnections: false,
+      queueLimit: 0,
     });
 
     await pool.query("SELECT 1");
@@ -24,7 +28,8 @@ async function writeDocumentEvent(event) {
   if (!pool) return;
 
   try {
-    const sql = `
+    await pool.execute(
+      `
       INSERT INTO document_events (
         request_id,
         document_name,
@@ -38,33 +43,41 @@ async function writeDocumentEvent(event) {
         connection_closed_early
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const values = [
-      event.requestId,
-      event.documentName,
-      event.receivedAt,
-      event.completedAt,
-      event.durationMs,
-      event.documentSizeMb,
-      event.bytesSent,
-      event.outcome,
-      event.errorType,
-      event.connectionClosedEarly,
-    ];
-
-    await pool.execute(sql, values);
+      `,
+      [
+        event.requestId,
+        event.documentName,
+        event.receivedAt,
+        event.completedAt,
+        event.durationMs,
+        event.documentSizeMb,
+        event.bytesSent,
+        event.outcome,
+        event.errorType,
+        event.connectionClosedEarly,
+      ],
+    );
   } catch (err) {
     console.error("Failed to persist document event:", err.message);
   }
 }
 
-
 async function writeRequestEvent(event) {
   if (!pool) return;
 
+  let conn;
   try {
-    const sql = `
+    conn = await pool.getConnection();
+
+    console.log(
+      "[DB] Using connection",
+      conn.threadId,
+      "for request",
+      event.requestId,
+    );
+
+    await conn.execute(
+      `
       INSERT INTO request_events (
         request_id,
         received_at,
@@ -79,25 +92,25 @@ async function writeRequestEvent(event) {
         connection_closed_early
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const values = [
-      event.requestId,
-      event.receivedAt,
-      event.completedAt,
-      event.durationMs,
-      event.outcome,
-      event.errorType,
-      event.documentSizeMb,
-      event.bytesSent,
-      event.heapUsedMb,
-      event.rssMb,
-      event.connectionClosedEarly,
-    ];
-
-    await pool.execute(sql, values);
+      `,
+      [
+        event.requestId,
+        event.receivedAt,
+        event.completedAt,
+        event.durationMs,
+        event.outcome,
+        event.errorType,
+        event.documentSizeMb,
+        event.bytesSent,
+        event.heapUsedMb,
+        event.rssMb,
+        event.connectionClosedEarly,
+      ],
+    );
   } catch (err) {
     console.error("Failed to persist request event:", err.message);
+  } finally {
+    if (conn) conn.release();
   }
 }
 
