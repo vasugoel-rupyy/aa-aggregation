@@ -1,131 +1,99 @@
 "use client";
 
 import { useState } from "react";
+import { useEffect } from "react";
+
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
-  const [warning, setWarning] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [timeMs, setTimeMs] = useState<number | null>(null);
-  const [responseJson, setResponseJson] = useState<any>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPdf, setShowPdf] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+  if (!showPdf || !pdfUrl || !requestId) return;
+
+  const timer = setTimeout(() => {
+    fetch("http://localhost:3000/client/render-success", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId }),
+    }).catch(() => {});
+  }, 1000); // wait to ensure render
+
+  return () => clearTimeout(timer);
+}, [showPdf, pdfUrl, requestId]);
+
+  function reportPdfError(type: string) {
+    fetch("http://localhost:3000/client/error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestId,
+        errorType: type,
+        meta: {
+          url: pdfUrl,
+          userAgent: navigator.userAgent,
+        },
+      }),
+    }).catch(() => {});
+  }
 
   async function callAggregator() {
     setLoading(true);
-    setError(null);
-    setWarning(null);
-    setTimeMs(null);
-    setResponseJson(null);
-    setPdfUrl(null);
     setShowPdf(false);
+    setPdfUrl(null);
+    setRequestId(null);
 
-    const start = performance.now();
+    const res = await fetch("http://localhost:3000/aa/aggregated-response", {
+      cache: "no-store",
+    });
 
-    try {
-      const res = await fetch("http://localhost:3000/aa/aggregated-response", {
-        headers: {
-          "Accept-Encoding": "gzip",
-        },
-      });
+    const text = await res.text();
+    const match = text.match(/"downloadUrl"\s*:\s*"([^"]+)"/);
 
-      if (!res.ok) {
-        throw new Error(`Request failed: ${res.status}`);
-      }
+    if (match) {
+      const fullUrl = "http://localhost:3000" + match[1];
+      setPdfUrl(fullUrl);
 
-      const text = await res.text();
-      console.log("Full response text:", text);
-      console.log("JSON:", JSON.parse(text));
-      const end = performance.now();
-      setTimeMs(Math.round(end - start));
-
-      try {
-        const data = JSON.parse(text);
-        setResponseJson(data);
-
-        if (data.document?.downloadUrl) {
-          setPdfUrl("http://localhost:3000" + data.document.downloadUrl);
-        }
-      } catch {
-        setWarning(
-          "Large streamed response could not be fully parsed in the browser. This is expected. Document download is still available.",
-        );
-
-        const match = text.match(/"downloadUrl"\s*:\s*"([^"]+)"/);
-        if (match) {
-          setPdfUrl("http://localhost:3000" + match[1]);
-        }
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Unknown error");
-    } finally {
-      setLoading(false);
+      const idMatch = fullUrl.match(/requestId=([^&]+)/);
+      if (idMatch) setRequestId(idMatch[1]);
     }
+
+    setLoading(false);
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-5xl bg-slate-800 rounded-xl shadow-2xl p-6 text-slate-200">
-        <h1 className="text-2xl font-semibold mb-4">AA Aggregation Demo</h1>
-
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+      <div className="w-full max-w-4xl bg-slate-900 rounded-xl p-6 text-slate-200">
         <button
           onClick={callAggregator}
           disabled={loading}
-          className={`px-4 py-2 rounded-lg bg-blue-600 text-white mb-4
-            ${loading ? "opacity-60 cursor-not-allowed" : "hover:bg-blue-500"}
-          `}
+          className="px-4 py-2 bg-blue-600 rounded-lg mb-4"
         >
-          {loading ? "Calling..." : "Call Aggregator API"}
+          {loading ? "Processing…" : "Call Aggregator"}
         </button>
 
-        {error && (
-          <div className="border border-red-500 text-red-400 rounded-lg p-3 mb-4">
-            Error: {error}
-          </div>
+        {pdfUrl && !showPdf && (
+          <button
+            onClick={() => setShowPdf(true)}
+            className="px-3 py-1 rounded border border-blue-500 text-blue-400"
+          >
+            Open PDF
+          </button>
         )}
 
-        {warning && (
-          <div className="border border-yellow-500 text-yellow-300 rounded-lg p-3 mb-4">
-            ⚠️ {warning}
-          </div>
-        )}
-
-        {timeMs !== null && (
-          <div className="border border-slate-600 rounded-lg p-3 mb-4">
-            <strong>Total Client Time:</strong> {timeMs} ms
-          </div>
-        )}
-
-        {responseJson && (
-          <div className="border border-slate-600 rounded-lg p-3 mb-4">
-            <p className="font-medium mb-2">Aggregated Response</p>
-            <pre className="max-h-72 overflow-auto bg-slate-950 p-3 rounded text-xs">
-              {JSON.stringify(responseJson, null, 2)}
-            </pre>
-          </div>
-        )}
-
-        {pdfUrl && (
-          <div className="border border-slate-600 rounded-lg p-3">
-            <p className="font-medium mb-2">Document</p>
-
-            {!showPdf ? (
-              <button
-                onClick={() => setShowPdf(true)}
-                className="px-3 py-1 rounded-md border border-blue-500 text-blue-400 hover:bg-blue-500/10"
-              >
-                Load PDF
-              </button>
-            ) : (
-              <div className="mt-3">
-                <iframe
-                  src={pdfUrl}
-                  className="w-full h-[500px] border border-slate-700 rounded-md"
-                />
-              </div>
-            )}
-          </div>
+        {showPdf && pdfUrl && (
+          <iframe
+            key={pdfUrl}
+            src={pdfUrl}
+            onError={() => {
+              setError("Failed to load PDF");
+              reportPdfError("IFRAME_RENDER_FAILURE");
+            }}
+            className="w-full h-[520px] rounded-lg border border-slate-800 bg-slate-900"
+          />
         )}
       </div>
     </div>

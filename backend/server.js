@@ -1,27 +1,27 @@
 const express = require("express");
-const app = express();
 const cors = require("cors");
 const { initMySQL } = require("./db/mysql");
 
+const app = express();
 const PORT = 3000;
-app.use(cors({ origin: "http://localhost:3001" }));
 
-const statementRoutes = require("./api/statement");
-const analyticsRoutes = require("./api/analytics");
-const documentRoutes = require("./api/document");
-const aggregatorRoutes = require("./api/aggregator");
+app.use(
+  cors({
+    origin: "http://localhost:3001",
+    methods: ["GET", "POST"],
+    credentials: true,
+  }),
+);
 
-app.use(statementRoutes);
-app.use(analyticsRoutes);
-app.use(documentRoutes);
-app.use(aggregatorRoutes);
+app.use(require("./routes/internal/statement.route"));
+app.use(require("./routes/internal/analytics.route"));
+app.use(require("./routes/internal/document.route"));
+app.use(require("./routes/aggregator.route"));
+app.use(require("./routes/client-error.route"));
+app.use(require("./routes/client-ack.route"));
 
 (async () => {
-  try {
-    await initMySQL();
-  } catch (err) {
-    console.error("Unexpected MySQL init failure:", err);
-  }
+  await initMySQL();
 })();
 
 app.listen(PORT, () => {
